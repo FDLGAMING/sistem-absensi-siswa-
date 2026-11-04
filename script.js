@@ -1,57 +1,53 @@
 
-// ===================================
-// SISTEM ABSENSI SISWA
-// JAVASCRIPT
-// ===================================
+// ======================================
+// SISTEM ABSENSI SISWA - SUPABASE
+// ======================================
 
-// MENGAMBIL ELEMEN HTML
+const SUPABASE_URL = "https://xlqicsxvgwfdizokvxlq.supabase.co";
+const SUPABASE_KEY = "TEMPEL_PUBLISHABLE_KEY_DI_SINI";
+
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ELEMENT HTML
 const loginPage = document.getElementById("loginPage");
 const registerPage = document.getElementById("registerPage");
 const forgotPage = document.getElementById("forgotPage");
 const dashboardPage = document.getElementById("dashboardPage");
 
-// NAVIGASI HALAMAN
 function showPage(page) {
-    loginPage.classList.add("hidden");
-    registerPage.classList.add("hidden");
-    forgotPage.classList.add("hidden");
-    dashboardPage.classList.add("hidden");
+    [loginPage, registerPage, forgotPage, dashboardPage]
+        .forEach(p => p.classList.add("hidden"));
 
     page.classList.remove("hidden");
 }
 
-// TOMBOL PINDAH HALAMAN
-document.getElementById("goRegister").onclick = function(e) {
+function showError(error) {
+    alert(error.message || "Terjadi kesalahan.");
+}
+
+// NAVIGASI
+document.getElementById("goRegister").onclick = e => {
     e.preventDefault();
     showPage(registerPage);
 };
 
-document.getElementById("goLogin").onclick = function(e) {
+document.getElementById("goLogin").onclick = e => {
     e.preventDefault();
     showPage(loginPage);
 };
 
-document.getElementById("goForgot").onclick = function(e) {
+document.getElementById("goForgot").onclick = e => {
     e.preventDefault();
     showPage(forgotPage);
 };
 
-document.getElementById("backLogin").onclick = function(e) {
+document.getElementById("backLogin").onclick = e => {
     e.preventDefault();
     showPage(loginPage);
 };
 
-// PENYIMPANAN DATA DEMO
-function getUsers() {
-    return JSON.parse(localStorage.getItem("users")) || [];
-}
-
-function saveUsers(users) {
-    localStorage.setItem("users", JSON.stringify(users));
-}
-
-// PENDAFTARAN AKUN
-document.getElementById("registerForm").onsubmit = function(e) {
+// REGISTRASI
+document.getElementById("registerForm").onsubmit = async function(e) {
     e.preventDefault();
 
     const first = document.getElementById("firstName").value.trim();
@@ -59,152 +55,184 @@ document.getElementById("registerForm").onsubmit = function(e) {
     const email = document.getElementById("registerEmail").value.trim().toLowerCase();
     const password = document.getElementById("registerPassword").value;
 
-    let users = getUsers();
+    const { data, error } = await db.auth.signUp({
+        email,
+        password,
+        options: {
+            data: {
+                first_name: first,
+                last_name: last
+            }
+        }
+    });
 
-    if (users.some(user => user.email === email)) {
-        alert("Email sudah terdaftar!");
-        return;
-    }
-
-    const newUser = {
-        first: first,
-        last: last,
-        email: email,
-        password: password,
-        className: "",
-        attendance: ""
-    };
-
-    users.push(newUser);
-    saveUsers(users);
-
-    alert("Pendaftaran berhasil! Silakan login.");
+    if (error) return showError(error);
 
     this.reset();
-    showPage(loginPage);
+
+    if (!data.session) {
+        alert("Pendaftaran berhasil! Silakan periksa email untuk verifikasi akun.");
+        showPage(loginPage);
+    } else {
+        alert("Pendaftaran berhasil!");
+        openDashboard(data.user);
+    }
 };
 
-// LOGIN AKUN
-document.getElementById("loginForm").onsubmit = function(e) {
+// LOGIN
+document.getElementById("loginForm").onsubmit = async function(e) {
     e.preventDefault();
 
     const email = document.getElementById("loginEmail").value.trim().toLowerCase();
     const password = document.getElementById("loginPassword").value;
 
-    const users = getUsers();
-
-    const user = users.find(function(account) {
-        return account.email === email &&
-               account.password === password;
+    const { data, error } = await db.auth.signInWithPassword({
+        email,
+        password
     });
 
-    if (!user) {
-        alert("Email atau password salah!");
-        return;
-    }
-
-    localStorage.setItem("activeUser", email);
+    if (error) return showError(error);
 
     this.reset();
-    openDashboard(user);
+    await openDashboard(data.user);
 };
 
-// MEMBUKA DASHBOARD
-function openDashboard(user) {
+// DASHBOARD
+async function openDashboard(user) {
+    const { data: profile, error } = await db
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .maybeSingle();
+
+    if (error) return showError(error);
+
+    const first = profile?.first_name || user.user_metadata?.first_name || "Siswa";
+    const last = profile?.last_name || user.user_metadata?.last_name || "";
+
     showPage(dashboardPage);
 
     document.getElementById("studentName").textContent =
-        "Halo, " + user.first + " " + user.last + "!";
+        "Halo, " + first + " " + last + "!";
 
     document.getElementById("classInfo").textContent =
-        user.className || "Belum bergabung";
+        "Belum bergabung";
 
-    document.getElementById("teacherInfo").textContent =
-        user.className ? "Belum ditentukan" : "-";
+    document.getElementById("teacherInfo").textContent = "-";
 
-    document.getElementById("attendanceStatus").textContent =
-        user.attendance || "Belum Absen";
-
-    document.getElementById("attendanceButton").disabled =
-        user.attendance !== "";
+    await checkAttendance(user);
 }
 
+// CEK ABSENSI HARI INI
+function getTodayRange() {
+    const now = new Date();
+
+    const start = new Date(now);
+    start.setHours(0, 0, 0, 0);
+
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
+
+    return {
+        start: start.toISOString(),
+        end: end.toISOString()
+    };
+}
+
+async function checkAttendance(user) {
+    const { start, end } = getTodayRange();
+
+    const { data, error } = await db
+        .from("attendance")
+        .select("id, status")
+        .eq("student_id", user.id)
+        .gte("created_at", start)
+        .lt("created_at", end)
+        .limit(1);
+
+    if (error) return showError(error);
+
+    const attended = data.length > 0;
+
+    document.getElementById("attendanceStatus").textContent =
+        attended ? data[0].status : "Belum Absen";
+
+    document.getElementById("attendanceButton").disabled = attended;
+}
+
+// ABSENSI
+document.getElementById("attendanceButton").onclick = async function() {
+    const { data: { user }, error: authError } =
+        await db.auth.getUser();
+
+    if (authError || !user) {
+        alert("Silakan login kembali.");
+        showPage(loginPage);
+        return;
+    }
+
+    const confirmation = confirm("Apakah kamu yakin ingin melakukan absensi?");
+
+    if (!confirmation) return;
+
+    const { error } = await db
+        .from("attendance")
+        .insert({
+            student_id: user.id,
+            status: "Hadir"
+        });
+
+    if (error) return showError(error);
+
+    alert("Absensi berhasil dicatat!");
+    await checkAttendance(user);
+};
+
 // LUPA PASSWORD
-document.getElementById("forgotForm").onsubmit = function(e) {
+document.getElementById("forgotForm").onsubmit = async function(e) {
     e.preventDefault();
 
     const email = document.getElementById("forgotEmail").value.trim().toLowerCase();
 
-    const users = getUsers();
+    const { error } = await db.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin
+    });
 
-    const user = users.find(account => account.email === email);
+    if (error) return showError(error);
 
-    if (!user) {
-        alert("Email tidak ditemukan!");
-        return;
-    }
-
-    alert(
-        "Email ditemukan. Fitur pengiriman tautan reset password membutuhkan backend dan verifikasi email. Fitur ini belum aktif."
-    );
-};
-
-// ABSENSI DEMO
-document.getElementById("attendanceButton").onclick = function() {
-    const email = localStorage.getItem("activeUser");
-
-    let users = getUsers();
-
-    const user = users.find(account => account.email === email);
-
-    if (!user || user.attendance !== "") {
-        alert("Absensi tidak dapat dilakukan.");
-        return;
-    }
-
-    const confirmation = confirm(
-        "Apakah kamu yakin ingin melakukan absensi?"
-    );
-
-    if (!confirmation) {
-        return;
-    }
-
-    user.attendance = "Hadir";
-
-    saveUsers(users);
-
-    alert("Absensi demo berhasil dicatat!");
-
-    openDashboard(user);
+    alert("Jika email terdaftar, tautan reset password akan dikirim. Periksa kotak masuk email.");
+    this.reset();
+    showPage(loginPage);
 };
 
 // LOGOUT
-document.getElementById("logoutButton").onclick = function() {
-    localStorage.removeItem("activeUser");
+document.getElementById("logoutButton").onclick = async function() {
+    const { error } = await db.auth.signOut();
+
+    if (error) return showError(error);
 
     alert("Kamu berhasil logout.");
-
     showPage(loginPage);
 };
 
-// MEMERIKSA SESI LOGIN
-window.onload = function() {
-    const activeEmail = localStorage.getItem("activeUser");
+// CEK SESI SAAT WEBSITE DIBUKA
+async function initializeApp() {
+    const { data, error } = await db.auth.getSession();
 
-    if (activeEmail) {
-        const users = getUsers();
+    if (error) return showError(error);
 
-        const user = users.find(account =>
-            account.email === activeEmail
-        );
-
-        if (user) {
-            openDashboard(user);
-            return;
-        }
+    if (data.session) {
+        await openDashboard(data.session.user);
+    } else {
+        showPage(loginPage);
     }
+}
 
-    showPage(loginPage);
-};
+initializeApp();
 
+// MEMANTAU PERUBAHAN LOGIN
+db.auth.onAuthStateChange((event, session) => {
+    if (event === "SIGNED_OUT") {
+        showPage(loginPage);
+    }
+});
