@@ -1,1 +1,131 @@
 
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Absensi Siswa</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <header class="header">
+        <div class="logo">AS</div>
+        <div>
+            <h2>Absensi Siswa</h2>
+            <p>Sistem Kehadiran Sekolah</p>
+        </div>
+    </header>
+
+    <main class="container">
+
+        <!-- HALAMAN LOGIN -->
+        <section id="loginPage" class="auth-box">
+            <h1>Selamat Datang</h1>
+            <p>Silakan login ke akun Anda.</p>
+
+            <form id="loginForm">
+                <label>Email</label>
+                <input type="email" id="loginEmail"
+                    placeholder="Masukkan email" required>
+
+                <label>Password</label>
+                <input type="password" id="loginPassword"
+                    placeholder="Masukkan password" required>
+
+                <button type="submit">Login</button>
+            </form>
+
+            <p>Belum punya akun?
+                <a href="#" id="goRegister">Daftar sekarang</a>
+            </p>
+
+            <a href="#" id="goForgot">Lupa password?</a>
+        </section>
+
+        <!-- HALAMAN DAFTAR -->
+        <section id="registerPage" class="auth-box hidden">
+            <h1>Buat Akun</h1>
+            <p>Daftarkan akun siswa Anda.</p>
+
+            <form id="registerForm">
+                <label>Nama Depan</label>
+                <input type="text" id="firstName"
+                    placeholder="Nama depan" required>
+
+                <label>Nama Belakang</label>
+                <input type="text" id="lastName"
+                    placeholder="Nama belakang" required>
+
+                <label>Email</label>
+                <input type="email" id="registerEmail"
+                    placeholder="Email aktif" required>
+
+                <label>Password</label>
+                <input type="password" id="registerPassword"
+                    placeholder="Minimal 6 karakter"
+                    minlength="6" required>
+
+                <button type="submit">Daftar</button>
+            </form>
+
+            <p>Sudah punya akun?
+                <a href="#" id="goLogin">Login</a>
+            </p>
+        </section>
+
+        <!-- HALAMAN LUPA PASSWORD -->
+        <section id="forgotPage" class="auth-box hidden">
+            <h1>Lupa Password</h1>
+            <p>Masukkan email akun Anda.</p>
+
+            <form id="forgotForm">
+                <label>Email</label>
+                <input type="email" id="forgotEmail"
+                    placeholder="Masukkan email" required>
+
+                <button type="submit">Lanjutkan</button>
+            </form>
+
+            <a href="#" id="backLogin">Kembali ke login</a>
+        </section>
+
+        <!-- DASHBOARD SISWA -->
+        <section id="dashboardPage" class="hidden">
+
+            <div class="welcome-box">
+                <h1 id="studentName">Halo, Siswa!</h1>
+                <p>Selamat datang di dashboard absensi.</p>
+            </div>
+
+            <div class="dashboard-card">
+                <h3>Informasi Kelas</h3>
+                <p>Kelas: <span id="classInfo">Belum bergabung</span></p>
+                <p>Wali Kelas: <span id="teacherInfo">-</span></p>
+            </div>
+
+            <div class="dashboard-card">
+                <h3>Absensi Hari Ini</h3>
+                <p>Status: <span id="attendanceStatus">Belum Absen</span></p>
+                <button id="attendanceButton">
+                    Mulai Absensi
+                </button>
+            </div>
+
+            <button id="logoutButton" class="logout">
+                Logout
+            </button>
+
+        </section>
+
+    </main>
+
+    <footer>
+        <p>© 2026 Sistem Absensi Siswa</p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+  </html>
+  
